@@ -796,13 +796,10 @@ it.skipIf(process.platform === "win32").each([true, false])(
   },
 );
 
-it("runs release PR CI without enabling implementation pushes on release branches", async () => {
+it("keeps the disabled CI callable without automatic push, PR, or schedule triggers", async () => {
   const workflow = z
     .object({
-      on: z.object({
-        push: z.object({ branches: z.array(z.string()) }),
-        pull_request: z.object({ branches: z.array(z.string()) }),
-      }),
+      on: z.record(z.string(), z.unknown()),
     })
     .parse(
       parse(
@@ -812,10 +809,11 @@ it("runs release PR CI without enabling implementation pushes on release branche
         ),
       ),
     );
-  expect(workflow.on.push.branches).toEqual(["main"]);
-  expect(workflow.on.pull_request.branches).toEqual(
-    expect.arrayContaining(["main", "release/*"]),
-  );
+  expect(workflow.on).not.toHaveProperty("push");
+  expect(workflow.on).not.toHaveProperty("pull_request");
+  expect(workflow.on).not.toHaveProperty("schedule");
+  expect(workflow.on.workflow_dispatch).toBeNull();
+  expect(workflow.on.workflow_call).toBeTypeOf("object");
 });
 
 it("routes website verification through the central PR policy", async () => {

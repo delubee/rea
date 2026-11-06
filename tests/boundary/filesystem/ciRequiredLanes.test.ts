@@ -454,9 +454,7 @@ it("keeps fast feedback separate from complete qualification and release proof",
   const ci = z
     .object({
       on: z.object({
-        push: z.unknown(),
-        pull_request: z.unknown(),
-        schedule: z.array(z.object({ cron: z.string() })),
+        workflow_dispatch: z.null(),
         workflow_call: z.object({
           inputs: z.object({
             source_sha: z.object({
@@ -502,10 +500,23 @@ it("keeps fast feedback separate from complete qualification and release proof",
         ),
       ),
     );
-  expect(ci.on.schedule).toEqual([
-    { cron: "23 0-2,4-23 * * *" },
-    { cron: "23 3 * * *" },
-  ]);
+  // Automatic triggers are disabled; CI runs only from manual dispatch and
+  // explicit callers (ci-full-pr.yml and release.yml qualification).
+  const rawOn = z
+    .record(z.string(), z.unknown())
+    .parse(
+      (
+        parse(
+          await readFile(
+            new URL("../../../.github/workflows/ci.yml", import.meta.url),
+            "utf8",
+          ),
+        ) as { on?: unknown }
+      ).on,
+    );
+  expect(rawOn).not.toHaveProperty("push");
+  expect(rawOn).not.toHaveProperty("pull_request");
+  expect(rawOn).not.toHaveProperty("schedule");
   expect(ci.concurrency.group).toContain("'qualification' || 'feedback'");
   expect(ci.concurrency.group).toContain("inputs.source_sha ||");
   expect(ci.concurrency.group).toContain("github.ref");

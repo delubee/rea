@@ -671,6 +671,7 @@ it("exports turbo remote-cache credentials wherever a workflow runs turbo", asyn
     /\bturbo\b|build:cached|check:ci|docs:check|docs:generate|docs:prepare|test:prepare/u;
   const workflowSchema = z.object({
     env: z.record(z.string(), z.unknown()).optional(),
+    on: z.record(z.string(), z.unknown()).optional(),
     jobs: z.record(
       z.string(),
       z
@@ -709,7 +710,12 @@ it("exports turbo remote-cache credentials wherever a workflow runs turbo", asyn
         expect(token, `${file}:${name}`).not.toContain(
           "github.event_name == 'workflow_call'",
         );
-      for (const event of ["push", "schedule", "workflow_dispatch"])
+      // Credentials must cover the events the workflow actually declares.
+      // Called workflows observe the caller's event, so workflow_call is
+      // covered through remote_cache_write or the caller-event grant above.
+      for (const event of ["push", "schedule", "workflow_dispatch"].filter(
+        (event) => event in (workflow.on ?? {}),
+      ))
         expect(token, `${file}:${name}`).toContain(
           `github.event_name == '${event}'`,
         );

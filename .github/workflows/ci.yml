@@ -1,13 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main, "release/*"]
-  schedule:
-    - cron: "23 0-2,4-23 * * *"
-    - cron: "23 3 * * *"
+  # Automatic triggers (push/pull_request/schedule) are disabled; this
+  # workflow now runs only on manual dispatch and when called by
+  # ci-full-pr.yml or release.yml qualification.
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -29,9 +25,7 @@ permissions:
   contents: read
 
 concurrency:
-  # Complete qualification finishes even while main receives more pushes.
-  # Main feedback also finishes, coalescing newer pushes to one pending run.
-  # Scheduled/manual main runs coalesce to one active and the latest pending;
+  # Manual main dispatch runs coalesce to one active and the latest pending;
   # release and label-triggered qualification use exact-revision groups.
   group: ci-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || inputs.source_sha != '' || contains(github.event.pull_request.labels.*.name, 'ci:full')) && 'qualification' || 'feedback' }}-${{ inputs.source_sha || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' && inputs.source_sha == '' && !contains(github.event.pull_request.labels.*.name, 'ci:full') }}
@@ -42,11 +36,11 @@ env:
   # TURBO_TOKEN via vercel/setup-turborepo-remote-cache-action; do not commit a token.
   # A called workflow sees the caller event, so workflow_call is not an event
   # name here. Release qualification sets remote_cache_write and passes the
-  # token. Open pull requests get an empty token and the local cache only.
-  # Remote reads need a credential, and pull requests do not receive one.
-  TURBO_TOKEN: "${{ (inputs.remote_cache_write == true || (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'))) && secrets.TURBO_TOKEN || '' }}"
+  # token; manual dispatch on the default branch also gets remote access.
+  # Other manual runs get an empty token and the local cache only.
+  TURBO_TOKEN: "${{ (inputs.remote_cache_write == true || (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && github.event_name == 'workflow_dispatch')) && secrets.TURBO_TOKEN || '' }}"
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-  TURBO_CACHE: "${{ (inputs.remote_cache_write == true || (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'))) && 'local:rw,remote:rw' || 'local:rw' }}"
+  TURBO_CACHE: "${{ (inputs.remote_cache_write == true || (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && github.event_name == 'workflow_dispatch')) && 'local:rw,remote:rw' || 'local:rw' }}"
 
 jobs:
   changes:
